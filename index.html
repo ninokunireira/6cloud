@@ -24,7 +24,7 @@
     --enemy-bg:#2e2036; --enemy-border:#7a50a0;
   }
   *{box-sizing:border-box;margin:0;padding:0;}
-  html{display:flex;justify-content:center;align-items:flex-start;min-height:100vh;background:var(--bg);}
+  html{background:var(--bg);min-height:100vh;}
   body{background:var(--bg);color:var(--text);font-family:'Noto Sans TC',sans-serif;font-size:13px;width:1366px;min-height:740px;overflow-x:hidden;overflow-y:auto;display:flex;flex-direction:column;}
 
   /* TOP BAR */
@@ -443,64 +443,6 @@ function closeAllAttrs() {
   renderGallery();
 }
 
-// ── SCREENSHOT ──
-async function screenshotFormation() {
-  const target = document.getElementById('formation-area');
-  const rect   = target.getBoundingClientRect();
-  const dpr    = window.devicePixelRatio || 1;
-
-  let stream;
-  try {
-    stream = await navigator.mediaDevices.getDisplayMedia({
-      video: { mediaSource: 'screen', cursor: 'never' },
-      audio: false
-    });
-  } catch (e) {
-    showToast('⚠ 已取消截圖');
-    return;
-  }
-
-  const track = stream.getVideoTracks()[0];
-  const video = document.createElement('video');
-  video.srcObject = stream;
-  video.muted = true;
-
-  await new Promise(res => { video.onloadedmetadata = res; });
-  await video.play();
-  // 等兩幀讓選擇器完全關閉、畫面還原
-  await new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res)));
-
-  const dpr2 = window.devicePixelRatio || 1;
-  const sx = Math.round((rect.left + window.scrollX) * dpr2);
-  const sy = Math.round((rect.top  + window.scrollY) * dpr2);
-  const sw = Math.round(rect.width  * dpr2);
-  const sh = Math.round(rect.height * dpr2);
-
-  const canvas = document.createElement('canvas');
-  canvas.width  = sw;
-  canvas.height = sh;
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, sw, sh);
-
-  track.stop();
-  stream.getTracks().forEach(t => t.stop());
-
-  canvas.toBlob(blob => {
-    if (!blob) { showToast('⚠ 截圖失敗'); return; }
-    const url = URL.createObjectURL(blob);
-    const a   = document.createElement('a');
-    const now = new Date();
-    const ds  = `${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}`;
-    a.download = `隊伍陣型_${ds}.png`;
-    a.href = url;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('✓ 截圖已下載！');
-  }, 'image/png');
-}
-
 // ── ROSTER ──
 function copyRoster() {
   const lines = formation.map((bId, i) => {
@@ -626,36 +568,27 @@ function loadDemo() {
   initUI();
 }
 
-function initUI() { buildFormationGrid(); restoreFormation(); renderGallery(); renderFormation(); }
+function initUI() { buildFormationGrid(); restoreFormation(); renderGallery(); renderFormation(); applyScale(); }
 
 
 // ── VIEWPORT SCALE ──
 function applyScale() {
   const BASE_W = 1366;
-  const BASE_H = 740;
   const vw = window.innerWidth;
-  const vh = window.innerHeight;
   if (vw < BASE_W) {
     const scale = vw / BASE_W;
-    // transform shrinks visually but body still occupies original space in layout.
-    // Use a wrapper approach: negative margin-bottom to collapse the phantom space,
-    // and set html height to the scaled size so nothing bleeds through.
     document.body.style.transformOrigin = 'top left';
     document.body.style.transform = `scale(${scale})`;
-    // Collapse the extra layout space the unscaled body occupies
-    document.body.style.marginBottom = `-${Math.round(BASE_H * (1 - scale))}px`;
-    document.documentElement.style.justifyContent = 'flex-start';
-    document.documentElement.style.alignItems = 'flex-start';
-    document.documentElement.style.overflow = 'hidden auto';
-    document.documentElement.style.height = Math.ceil(BASE_H * scale) + 'px';
+    // body layout is still 1366px wide after transform; collapse the extra vertical space
+    const bodyH = document.body.scrollHeight;
+    document.body.style.marginBottom = `-${Math.round(bodyH * (1 - scale))}px`;
+    document.body.style.marginLeft = '0';
   } else {
     document.body.style.transform = '';
     document.body.style.transformOrigin = '';
     document.body.style.marginBottom = '';
-    document.documentElement.style.justifyContent = 'center';
-    document.documentElement.style.alignItems = 'flex-start';
-    document.documentElement.style.overflow = '';
-    document.documentElement.style.height = '';
+    // Center body horizontally when viewport is wider than 1366px
+    document.body.style.marginLeft = Math.floor((vw - BASE_W) / 2) + 'px';
   }
 }
 applyScale();
