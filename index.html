@@ -632,21 +632,30 @@ function initUI() { buildFormationGrid(); restoreFormation(); renderGallery(); r
 // ── VIEWPORT SCALE ──
 function applyScale() {
   const BASE_W = 1366;
+  const BASE_H = 740;
   const vw = window.innerWidth;
+  const vh = window.innerHeight;
   if (vw < BASE_W) {
-    // Shrink: scale from top-left, shift body left (no centering needed, page fills width)
     const scale = vw / BASE_W;
+    // transform shrinks visually but body still occupies original space in layout.
+    // Use a wrapper approach: negative margin-bottom to collapse the phantom space,
+    // and set html height to the scaled size so nothing bleeds through.
     document.body.style.transformOrigin = 'top left';
     document.body.style.transform = `scale(${scale})`;
-    document.body.style.marginLeft = '';
+    // Collapse the extra layout space the unscaled body occupies
+    document.body.style.marginBottom = `-${Math.round(BASE_H * (1 - scale))}px`;
     document.documentElement.style.justifyContent = 'flex-start';
-    document.documentElement.style.overflow = 'hidden';
+    document.documentElement.style.alignItems = 'flex-start';
+    document.documentElement.style.overflow = 'hidden auto';
+    document.documentElement.style.height = Math.ceil(BASE_H * scale) + 'px';
   } else {
-    // Larger than base: center body horizontally, no scale
     document.body.style.transform = '';
     document.body.style.transformOrigin = '';
+    document.body.style.marginBottom = '';
     document.documentElement.style.justifyContent = 'center';
+    document.documentElement.style.alignItems = 'flex-start';
     document.documentElement.style.overflow = '';
+    document.documentElement.style.height = '';
   }
 }
 applyScale();
