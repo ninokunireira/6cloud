@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>流云尋空✦幻獸全力戰編組小工具</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-1HD0EDMYDS"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-1HD0EDMYDS');
+</script>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
   :root {
@@ -83,6 +91,7 @@
 
   /* TOOLBAR */
   #toolbar{display:flex;align-items:center;gap:8px;height:34px;flex-shrink:0;}
+  #copy-hint{font-size:10px;color:var(--text-dim);opacity:0.6;letter-spacing:0.5px;white-space:nowrap;}
   .btn{height:28px;padding:0 14px;border-radius:5px;border:1px solid var(--border-bright);background:var(--panel2);color:var(--text);font-size:12px;font-family:inherit;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;}
   .btn:hover{background:var(--cell-hover);border-color:var(--accent3);}
   .attr-divider{flex:1;}
@@ -123,6 +132,9 @@
   /* TOAST */
   #toast{position:fixed;bottom:40px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--accent2);color:#fff;padding:8px 24px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;pointer-events:none;transition:opacity .3s,transform .3s;z-index:9999;}
   #toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* PRIVACY NOTICE */
+  /* (privacy notice moved inline to toolbar as #copy-hint) */
 
   /* LOADING */
   #loading-logo{width:180px;object-fit:contain;margin-bottom:4px;}
@@ -188,6 +200,7 @@
     <div id="toolbar">
       <button class="btn" onclick="clearFormation()">清空隊伍</button>
       <button class="btn" onclick="copyRoster()" title="依序複製幻獸名稱方便紀錄使用。">複製名單</button>
+      <span id="copy-hint">💡 複製後將自動留存目前的隊伍配置，方便下次直接讀取。</span>
     </div>
   </div>
   <div id="gallery-wrap">
@@ -428,12 +441,36 @@ function closeAllAttrs() {
 }
 
 // ── ROSTER ──
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHC9ATd3Ia6UWJr2R7KMhaxdn1ltvL_v2zcgPqCwC4T6aTcqcOn7s8XGZ2KxqiYcqn/exec';
+
 function copyRoster() {
   const lines = formation.map((bId, i) => {
     const b = bId ? beasts.find(x => x.id === bId) : null;
     return `${i + 1}. ${b ? b.name : '（空）'}`;
   });
-  navigator.clipboard.writeText(lines.join('\n')).then(() => showToast('✓ 幻獸名單已複製！'));
+  const rosterText = lines.join('\n');
+
+  // 複製到剪貼簿
+  navigator.clipboard.writeText(rosterText).then(() => showToast('✓ 幻獸名單已複製！'));
+
+  // GA4 事件：記錄複製動作與上場幻獸數
+  const filledCount = formation.filter(b => b).length;
+  if (typeof gtag !== 'undefined') {
+    gtag('event', 'copy_roster', { beast_count: filledCount });
+  }
+
+  // 送出隊伍資料到 Google Sheets（靜默，不影響使用者操作）
+  if (filledCount === 0) return; // 空隊伍不送
+  const beastNames = formation.map(bId => {
+    const b = bId ? beasts.find(x => x.id === bId) : null;
+    return b ? b.name : null;
+  });
+  fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors', // Apps Script 不支援 CORS，用 no-cors 靜默送出
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ roster: rosterText, beasts: beastNames })
+  }).catch(() => {}); // 靜默忽略任何網路錯誤，不影響使用者
 }
 
 // ── TOOLTIP ──
