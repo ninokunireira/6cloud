@@ -453,24 +453,24 @@ function copyRoster() {
   // 複製到剪貼簿
   navigator.clipboard.writeText(rosterText).then(() => showToast('✓ 幻獸名單已複製！'));
 
-  // GA4 事件：記錄複製動作與上場幻獸數
+  // GA4 事件
   const filledCount = formation.filter(b => b).length;
   if (typeof gtag !== 'undefined') {
     gtag('event', 'copy_roster', { beast_count: filledCount });
   }
 
-  // 送出隊伍資料到 Google Sheets（靜默，不影響使用者操作）
-  if (filledCount === 0) return; // 空隊伍不送
-  const beastNames = formation.map(bId => {
+  // 送出隊伍資料（空格留空字串）
+  if (filledCount === 0) return;
+  const slots = formation.map(bId => {
     const b = bId ? beasts.find(x => x.id === bId) : null;
-    return b ? b.name : null;
+    return b ? b.name : '';
   });
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
-    mode: 'no-cors', // Apps Script 不支援 CORS，用 no-cors 靜默送出
+    mode: 'no-cors',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ roster: rosterText, beasts: beastNames })
-  }).catch(() => {}); // 靜默忽略任何網路錯誤，不影響使用者
+    body: JSON.stringify({ slots })
+  }).catch(() => {});
 }
 
 // ── TOOLTIP ──
