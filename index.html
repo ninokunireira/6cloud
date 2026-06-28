@@ -41,6 +41,14 @@
   #topbar h1{font-size:14px;font-weight:700;letter-spacing:3px;color:var(--accent3);margin-right:auto;line-height:1;}
   #topbar h1 span{color:var(--text-dim);font-weight:400;}
 
+  /* LANG BUTTONS */
+  #lang-bar{display:flex;align-items:flex-end;gap:6px;padding-bottom:6px;flex-shrink:0;}
+  .lang-btn{height:24px;padding:0 10px;border-radius:4px;border:none;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;color:#fff;opacity:0.55;transition:opacity .15s;}
+  .lang-btn.active{opacity:1;}
+  .lang-btn[data-lang="THM"]{background:var(--fire);}
+  .lang-btn[data-lang="JP"]{background:var(--water);}
+  .lang-btn[data-lang="KR"]{background:var(--dark);}
+
   /* MAIN */
   #main{display:flex;flex:1;min-height:0;}
 
@@ -157,7 +165,7 @@
 <body>
 
 <!-- LOADING -->
-<div id="loading"><img id="loading-logo" src="https://drive.google.com/thumbnail?id=1h9aYTi2I-dKe9SMvKVJk-OFd7AA6o4Ik&sz=w300" alt="LOGO"><div class="spinner"></div><span>載入幻獸資料中…</span></div>
+<div id="loading"><img id="loading-logo" src="https://drive.google.com/thumbnail?id=1h9aYTi2I-dKe9SMvKVJk-OFd7AA6o4Ik&sz=w300" alt="LOGO"><div class="spinner"></div><span id="loading-text">載入幻獸資料中…</span></div>
 
 <!-- ERROR PANEL -->
 <div id="error-panel">
@@ -185,13 +193,18 @@
 <!-- TOP BAR -->
 <div id="topbar">
   <img id="topbar-logo" src="https://drive.google.com/thumbnail?id=12EcewmVp0J9iXvnmqB4pevU7YeA2W3Fe&sz=w400" alt="LOGO">
-  <h1>二之國｜幻獸全力戰編組小工具</h1>
+  <h1 id="topbar-title">二之國｜幻獸全力戰編組小工具</h1>
+  <div id="lang-bar">
+    <button class="lang-btn active" data-lang="THM" onclick="setLang('THM')">THM</button>
+    <button class="lang-btn" data-lang="JP" onclick="setLang('JP')">JP</button>
+    <button class="lang-btn" data-lang="KR" onclick="setLang('KR')">KR</button>
+  </div>
 </div>
 
 <!-- MAIN -->
 <div id="main">
   <div id="formation-wrap">
-    <div id="formation-label">隊伍陣型模擬｜<span id="count-label">已選 0 / 40</span>｜可拖移編輯隊伍</div>
+    <div id="formation-label"><span id="form-label-text">隊伍陣型模擬｜</span><span id="count-label">已選 0 / 40</span>｜可拖移編輯隊伍</div>
     <div id="formation-area">
       <!-- cols injected by JS, enemy-col appended last (rightmost) -->
       <div id="enemy-col"><span>敵方位置</span></div>
@@ -227,10 +240,128 @@ let beasts = [];
 let formation = new Array(40).fill(null);
 let activeAttrs = new Set(['fire','water','wood','light','dark']);
 let dragBeastId = null;
-let dragFromSlot = null; // slot index if dragging FROM formation cell
+let dragFromSlot = null;
+let currentLang = 'THM';
 
 const ATTR_COLOR = {fire:'#ca6855',water:'#7590b8',wood:'#6c9b73',light:'#d4b965',dark:'#a680a5'};
 const ATTR_MAP = {'火':'fire','水':'water','木':'wood','光':'light','暗':'dark',fire:'fire',water:'water',wood:'wood',light:'light',dark:'dark'};
+
+// ── i18n ──
+const I18N = {
+  THM: {
+    title:       '二之國｜幻獸全力戰編組小工具',
+    loading:     '載入幻獸資料中…',
+    formLabel:   '隊伍陣型模擬｜可拖移編輯隊伍',
+    countLabel:  (n) => `已選 ${n} / 40`,
+    enemy:       '敵方位置',
+    btnClear:    '清空隊伍',
+    btnCopy:     '複製名單',
+    copyHint:    '💡 複製後將自動留存目前的隊伍配置，方便下次直接讀取。',
+    galleryLabel:'幻獸選擇 | 可直接拖移至左邊隊伍欄',
+    btnCloseAll: '關閉全屬',
+    toastCopied: '✓ 幻獸名單已複製！',
+    attrs:       {fire:'火', water:'水', wood:'木', light:'光', dark:'暗'},
+    attrLabels:  {fire:'火屬性', water:'水屬性', wood:'木屬性', light:'光屬性', dark:'暗屬性'},
+    tooltipAttr: (a) => `屬性：${a}`,
+    tooltipRange:(r) => `攻擊距離：${r}`,
+    tooltipDuel: (s) => `決鬥技能：${s}`,
+    tooltipSkill:(s) => `超極技能：${s}`,
+    emptySlot:   '（空）',
+  },
+  JP: {
+    title:       '二ノ国｜イマージェン探検総力戦 編成ツール',
+    loading:     'データ読み込み中…',
+    formLabel:   '編成シミュレーション｜ドラッグで編集',
+    countLabel:  (n) => `選択中 ${n} / 40`,
+    enemy:       '敵の位置',
+    btnClear:    '編成クリア',
+    btnCopy:     'リストコピー',
+    copyHint:    '💡 コピー時に現在の編成が自動保存されます。',
+    galleryLabel:'イマージェン選択 | 左にドラッグ',
+    btnCloseAll: '全属性OFF',
+    toastCopied: '✓ リストをコピーしました！',
+    attrs:       {fire:'火', water:'水', wood:'木', light:'光', dark:'闇'},
+    attrLabels:  {fire:'火属性', water:'水属性', wood:'木属性', light:'光属性', dark:'闇属性'},
+    tooltipAttr: (a) => `属性：${a}`,
+    tooltipRange: null, // hidden
+    tooltipDuel:  null, // hidden
+    tooltipSkill: null, // hidden
+    emptySlot:   '（空）',
+  },
+  KR: {
+    title:       '니노쿠니｜이마젠 탐험 총력전 편성 도구',
+    loading:     '데이터 로딩 중…',
+    formLabel:   '편성 시뮬레이션 | 드래그로 편집',
+    countLabel:  (n) => `선택됨 ${n} / 40`,
+    enemy:       '적 위치',
+    btnClear:    '편성 초기화',
+    btnCopy:     '명단 복사',
+    copyHint:    '💡 복사 시 현재 편성이 자동 저장됩니다.',
+    galleryLabel:'이마젠 선택 | 왼쪽으로 드래그',
+    btnCloseAll: '전체 속성 OFF',
+    toastCopied: '✓ 명단이 복사되었습니다！',
+    attrs:       {fire:'불', water:'물', wood:'나무', light:'빛', dark:'어둠'},
+    attrLabels:  {fire:'불 속성', water:'물 속성', wood:'나무 속성', light:'빛 속성', dark:'어둠 속성'},
+    tooltipAttr: (a) => `속성：${a}`,
+    tooltipRange: null, // hidden
+    tooltipDuel:  null, // hidden
+    tooltipSkill: null, // hidden
+    emptySlot:   '（빈칸）',
+  },
+};
+
+function setLang(lang) {
+  currentLang = lang;
+  const t = I18N[lang];
+
+  // topbar title
+  document.getElementById('topbar-title').textContent = t.title;
+
+  // lang buttons active state
+  document.querySelectorAll('.lang-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.lang === lang)
+  );
+
+  // formation label text
+  document.getElementById('form-label-text').textContent = t.formLabel + '｜';
+
+  // enemy col label
+  const enemySpan = document.querySelector('#enemy-col span');
+  if (enemySpan) enemySpan.textContent = t.enemy;
+
+  // toolbar buttons
+  document.querySelector('[onclick="clearFormation()"]').textContent = t.btnClear;
+  document.querySelector('[onclick="copyRoster()"]').textContent = t.btnCopy;
+  document.getElementById('copy-hint').textContent = t.copyHint;
+
+  // gallery label
+  document.getElementById('gallery-label').textContent = t.galleryLabel;
+
+  // attr buttons
+  document.querySelectorAll('.attr-btn').forEach(b => {
+    b.textContent = t.attrs[b.dataset.attr] || b.dataset.attr;
+  });
+
+  // close-all button
+  document.getElementById('btn-close-all').textContent = t.btnCloseAll;
+
+  // re-render to apply name changes
+  renderGallery();
+  renderFormation();
+  updateCount();
+}
+
+// ── 取得幻獸當前語言名稱 ──
+function beastName(b) {
+  if (currentLang === 'JP' && b.nameJp) return b.nameJp;
+  if (currentLang === 'KR' && b.nameKr) return b.nameKr;
+  return b.name;
+}
+
+// ── 取得屬性當前語言標籤 ──
+function attrLabel(attr) {
+  return I18N[currentLang].attrLabels[attr] || attr;
+}
 
 // ── BUILD GRID ──
 // Layout: 6 columns, right→left
@@ -334,14 +465,13 @@ function renderGallery() {
     const card = document.createElement('div');
     card.className = 'beast-card' + (inUse ? ' used' : '');
     card.draggable = !inUse;
-    // 屬性底色
     const baseColor = ATTR_COLOR[b.attr] || '#888';
     card.style.background = baseColor;
     const img = document.createElement('img');
-    img.src = b.imgUrl; img.alt = b.name; img.loading = 'lazy';
+    img.src = b.imgUrl; img.alt = beastName(b); img.loading = 'lazy';
     card.appendChild(img);
     const lbl = document.createElement('div');
-    lbl.className = 'card-label'; lbl.textContent = b.name;
+    lbl.className = 'card-label'; lbl.textContent = beastName(b);
     card.appendChild(lbl);
     card.addEventListener('dragstart', e => {
       if (inUse) { e.preventDefault(); return; }
@@ -423,7 +553,8 @@ function swapOrMoveSlots(fromIdx, toIdx) {
 function removeFromSlot(idx) { formation[idx] = null; renderFormation(); renderGallery(); saveFormation(); }
 function clearFormation() { formation = new Array(40).fill(null); renderFormation(); renderGallery(); saveFormation(); }
 function updateCount() {
-  document.getElementById('count-label').textContent = `已選 ${formation.filter(Boolean).length} / 40`;
+  const n = formation.filter(Boolean).length;
+  document.getElementById('count-label').textContent = I18N[currentLang].countLabel(n);
 }
 
 // ── ATTR FILTER ──
@@ -444,26 +575,25 @@ function closeAllAttrs() {
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyHC9ATd3Ia6UWJr2R7KMhaxdn1ltvL_v2zcgPqCwC4T6aTcqcOn7s8XGZ2KxqiYcqn/exec';
 
 function copyRoster() {
+  const t = I18N[currentLang];
   const lines = formation.map((bId, i) => {
     const b = bId ? beasts.find(x => x.id === bId) : null;
-    return `${i + 1}. ${b ? b.name : '（空）'}`;
+    return `${i + 1}. ${b ? beastName(b) : t.emptySlot}`;
   });
   const rosterText = lines.join('\n');
 
-  // 複製到剪貼簿
-  navigator.clipboard.writeText(rosterText).then(() => showToast('✓ 幻獸名單已複製！'));
+  navigator.clipboard.writeText(rosterText).then(() => showToast(t.toastCopied));
 
-  // GA4 事件
   const filledCount = formation.filter(b => b).length;
   if (typeof gtag !== 'undefined') {
-    gtag('event', 'copy_roster', { beast_count: filledCount });
+    gtag('event', 'copy_roster', { beast_count: filledCount, lang: currentLang });
   }
 
-  // 送出隊伍資料（空格留空字串）
-  if (filledCount === 0) return;
+  // 回傳固定使用中文名稱
+  if (filledCount < 35) return;
   const slots = formation.map(bId => {
     const b = bId ? beasts.find(x => x.id === bId) : null;
-    return b ? b.name : '';
+    return b ? b.name : ''; // b.name 永遠是中文
   });
   fetch(APPS_SCRIPT_URL, {
     method: 'POST',
@@ -476,8 +606,12 @@ function copyRoster() {
 // ── TOOLTIP ──
 function showTooltip(e, b) {
   const tip = document.getElementById('tooltip');
-  const skill = b.skill ? `<br>超極技能：${b.skill}` : '';
-  tip.innerHTML = `<strong>${b.name}</strong><br>屬性：${b.attrLabel || b.attr}<br>攻擊距離：${b.range || '—'}${skill}`;
+  const t = I18N[currentLang];
+  let html = `<strong>${beastName(b)}</strong><br>${t.tooltipAttr(attrLabel(b.attr))}`;
+  if (t.tooltipRange && b.range) html += `<br>${t.tooltipRange(b.range)}`;
+  if (t.tooltipDuel  && b.duelSkill) html += `<br>${t.tooltipDuel(b.duelSkill)}`;
+  if (t.tooltipSkill && b.skill) html += `<br>${t.tooltipSkill(b.skill)}`;
+  tip.innerHTML = html;
   tip.style.display = 'block'; posTooltip(e);
 }
 function posTooltip(e) {
@@ -534,28 +668,35 @@ async function startApp() {
     const headers = rows[0].map(h => String(h).trim());
     const findCol = (...keys) => headers.findIndex(h => keys.some(k => h.includes(k)));
 
-    const nameCol  = findCol('名稱','name','Name','NAME');
-    const attrCol  = findCol('屬性','attr','Attr','element','屬');
-    const rangeCol = findCol('距離','range','Range','攻擊','射程');
-    const imgCol   = findCol('圖片ID','圖片','img','Img','IMG','Drive','drive','縮圖');
-    const skillCol = findCol('超極技能','技能','skill','Skill');
+    const nameCol      = findCol('名稱','name','Name','NAME');
+    const nameJpCol    = findCol('日文','nameJp','name_jp','JP');
+    const nameKrCol    = findCol('韓文','nameKr','name_kr','KR');
+    const attrCol      = findCol('屬性','attr','Attr','element','屬');
+    const rangeCol     = findCol('距離','range','Range','攻擊','射程');
+    const imgCol       = findCol('圖片ID','圖片','img','Img','IMG','Drive','drive','縮圖');
+    const duelCol      = findCol('決鬥技能','決鬥','duel','Duel');
+    const skillCol     = findCol('超極技能','技能','skill','Skill');
+    const descCol      = findCol('說明','desc','Desc','description');
 
     if (nameCol === -1) throw new Error('找不到「名稱」欄位。偵測到欄位：' + headers.join('、'));
 
     beasts = [];
-    // rows[0]=標題, rows[1+]=實際資料
     rows.slice(1).forEach((cols, i) => {
-      const name = String(cols[nameCol] || '').trim();
+      const name     = String(cols[nameCol]   || '').trim();
       if (!name) return;
-      const attrRaw = attrCol >= 0 ? String(cols[attrCol] || '').trim() : '';
-      const range   = rangeCol >= 0 ? String(cols[rangeCol] || '').trim() : '';
-      const imgId   = imgCol >= 0 ? String(cols[imgCol] || '').trim() : '';
-      const skill   = skillCol >= 0 ? String(cols[skillCol] || '').trim() : '';
-      const attr    = ATTR_MAP[attrRaw] || 'fire';
-      const imgUrl  = imgId
+      const nameJp   = nameJpCol  >= 0 ? String(cols[nameJpCol]  || '').trim() : '';
+      const nameKr   = nameKrCol  >= 0 ? String(cols[nameKrCol]  || '').trim() : '';
+      const attrRaw  = attrCol    >= 0 ? String(cols[attrCol]    || '').trim() : '';
+      const range    = rangeCol   >= 0 ? String(cols[rangeCol]   || '').trim() : '';
+      const imgId    = imgCol     >= 0 ? String(cols[imgCol]     || '').trim() : '';
+      const duelSkill= duelCol    >= 0 ? String(cols[duelCol]    || '').trim() : '';
+      const skill    = skillCol   >= 0 ? String(cols[skillCol]   || '').trim() : '';
+      const desc     = descCol    >= 0 ? String(cols[descCol]    || '').trim() : '';
+      const attr     = ATTR_MAP[attrRaw] || 'fire';
+      const imgUrl   = imgId
         ? `https://drive.google.com/thumbnail?id=${imgId}&sz=w200`
         : `https://placehold.co/200x200/0d2426/56c8d4?text=${encodeURIComponent(name.charAt(0))}`;
-      beasts.push({ id:`b${i}`, name, attr, attrLabel:attrRaw, range, skill, imgUrl });
+      beasts.push({ id:`b${i}`, name, nameJp, nameKr, attr, attrLabel:attrRaw, range, duelSkill, skill, desc, imgUrl });
     });
 
     if (beasts.length === 0) throw new Error('讀取到 0 筆幻獸，請確認名稱欄不為空');
