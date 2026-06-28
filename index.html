@@ -289,7 +289,7 @@ const I18N = {
     emptySlot:   '（空）',
   },
   KR: {
-    title:       '니노쿠니｜이마젠 탐험 총력전 편성 도구',
+    title:       '제2의 나라｜이마젠 탐험 총력전 편성 도구',
     loading:     '데이터 로딩 중…',
     formLabel:   '편성 시뮬레이션 | 드래그로 편집',
     countLabel:  (n) => `선택됨 ${n} / 40`,
@@ -666,17 +666,28 @@ async function startApp() {
     if (rows.length < 2) throw new Error('資料不足（需有標題列＋至少一筆資料）');
 
     const headers = rows[0].map(h => String(h).trim());
-    const findCol = (...keys) => headers.findIndex(h => keys.some(k => h.includes(k)));
+    const findCol = (...keys) => {
+      // 優先完整匹配，再退而 includes
+      for (const k of keys) {
+        const i = headers.findIndex(h => h === k);
+        if (i !== -1) return i;
+      }
+      for (const k of keys) {
+        const i = headers.findIndex(h => h.includes(k));
+        if (i !== -1) return i;
+      }
+      return -1;
+    };
 
-    const nameCol      = findCol('名稱','name','Name','NAME');
-    const nameJpCol    = findCol('日文','nameJp','name_jp','JP');
-    const nameKrCol    = findCol('韓文','nameKr','name_kr','KR');
-    const attrCol      = findCol('屬性','attr','Attr','element','屬');
-    const rangeCol     = findCol('距離','range','Range','攻擊','射程');
-    const imgCol       = findCol('圖片ID','圖片','img','Img','IMG','Drive','drive','縮圖');
-    const duelCol      = findCol('決鬥技能','決鬥','duel','Duel');
-    const skillCol     = findCol('超極技能','技能','skill','Skill');
-    const descCol      = findCol('說明','desc','Desc','description');
+    const nameCol      = findCol('名稱','name');
+    const nameJpCol    = findCol('日文','name_jp','nameJp');
+    const nameKrCol    = findCol('韓文','name_kr','nameKr');
+    const attrCol      = findCol('屬性','attr','element');
+    const rangeCol     = findCol('攻擊距離','距離','range','射程');
+    const imgCol       = findCol('圖片ID','圖片','imgId');
+    const duelCol      = findCol('決鬥技能','決鬥','duel');
+    const skillCol     = findCol('超極技能','超極','skill');
+    const descCol      = findCol('說明','desc','description');
 
     if (nameCol === -1) throw new Error('找不到「名稱」欄位。偵測到欄位：' + headers.join('、'));
 
