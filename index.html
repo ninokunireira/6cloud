@@ -144,6 +144,9 @@
   /* PRIVACY NOTICE */
   /* (privacy notice moved inline to toolbar as #copy-hint) */
 
+  /* iOS touch 防干擾 */
+  .beast-card, .cell{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+
   /* LOADING */
   #loading-logo{width:180px;object-fit:contain;margin-bottom:4px;}
   #loading{position:fixed;inset:0;background:rgba(5,18,20,.92);display:flex;align-items:center;justify-content:center;z-index:9998;font-size:14px;color:var(--accent3);letter-spacing:2px;flex-direction:column;gap:12px;}
@@ -431,6 +434,10 @@ function buildFormationGrid() {
         cell.classList.remove('drag-source');
         dragFromSlot = null;
       });
+      cell.addEventListener('touchstart', e => {
+        if (!formation[idx]) return; // 空格子不觸發
+        touchStart(e, null, idx);
+      }, { passive: false });
       cell.draggable = true;
 
       col.appendChild(cell);
@@ -479,6 +486,9 @@ function renderGallery() {
       dragFromSlot = null;
       e.dataTransfer.effectAllowed = 'copy';
     });
+    if (!inUse) {
+      card.addEventListener('touchstart', e => touchStart(e, b.id, null), { passive: false });
+    }
     card.addEventListener('mousemove', e => showTooltip(e, b));
     card.addEventListener('mouseleave', hideTooltip);
     grid.appendChild(card);
@@ -534,7 +544,7 @@ function restoreFormation() {
 function dropBeast(idx) {
   if (!dragBeastId) return;
   if (formation.includes(dragBeastId)) return; // already placed
-  if (formation[idx] !== null) return;          // slot occupied → no replace from gallery
+  // 若格子已有幻獸，先將它清除回未選取狀態，再放入新幻獸
   formation[idx] = dragBeastId;
   dragBeastId = null;
   renderFormation(); renderGallery(); saveFormation();
@@ -603,7 +613,91 @@ function copyRoster() {
   }).catch(() => {});
 }
 
-// ── TOOLTIP ──
+// ── TOUCH DRAG（iOS Safari 支援）──
+// iOS 不支援原生 drag & drop，用 touch 事件模擬
+let touchDragEl   = null;  // 拖移中的視覺分身
+let touchBeastId  = null;  // 從 gallery 拖出的幻獸 id
+let touchFromSlot = null;  // 從 formation 拖出的槽位
+
+function touchStart(e, beastId, fromSlot) {
+  // 只處理單指
+  if (e.touches.length > 1) return;
+  e.preventDefault(); // 阻止捲動/長按選取
+
+  touchBeastId  = beastId;
+  touchFromSlot = fromSlot;
+
+  // 建立半透明視覺分身跟著手指
+  const src = e.currentTarget;
+  const clone = src.cloneNode(true);
+  clone.style.cssText = `
+    position:fixed;z-index:9999;pointer-events:none;opacity:0.75;
+    width:${src.offsetWidth}px;height:${src.offsetHeight}px;
+    border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.4);
+    top:${e.touches[0].clientY - src.offsetHeight/2}px;
+    left:${e.touches[0].clientX - src.offsetWidth/2}px;
+    transition:none;
+  `;
+  document.body.appendChild(clone);
+  touchDragEl = clone;
+
+  src.style.opacity = '0.35';
+  src._touchOriginOpacity = src.style.opacity;
+}
+
+function touchMove(e) {
+  if (!touchDragEl) return;
+  e.preventDefault();
+  const t = e.touches[0];
+  touchDragEl.style.left = (t.clientX - touchDragEl.offsetWidth/2)  + 'px';
+  touchDragEl.style.top  = (t.clientY - touchDragEl.offsetHeight/2) + 'px';
+
+  // 高亮目前手指下的格子
+  document.querySelectorAll('.cell.drag-over').forEach(c => c.classList.remove('drag-over'));
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const cell = el?.closest('.cell');
+  if (cell) cell.classList.add('drag-over');
+}
+
+function touchEnd(e) {
+  if (!touchDragEl) return;
+  e.preventDefault();
+
+  // 清除分身
+  touchDragEl.remove();
+  touchDragEl = null;
+
+  // 還原來源透明度
+  document.querySelectorAll('.beast-card, .cell').forEach(el => el.style.opacity = '');
+
+  // 找放開點的格子
+  const t = e.changedTouches[0];
+  document.querySelectorAll('.cell.drag-over').forEach(c => c.classList.remove('drag-over'));
+  const el = document.elementFromPoint(t.clientX, t.clientY);
+  const cell = el?.closest('.cell');
+
+  if (cell) {
+    const targetSlot = parseInt(cell.dataset.slot);
+    if (touchFromSlot !== null) {
+      swapOrMoveSlots(touchFromSlot, targetSlot);
+    } else if (touchBeastId !== null) {
+      dragBeastId = touchBeastId;
+      dropBeast(targetSlot);
+    }
+  }
+
+  touchBeastId  = null;
+  touchFromSlot = null;
+}
+
+// 在 document 層統一監聽 touchmove / touchend（手指可能滑出來源元素）
+document.addEventListener('touchmove',  touchMove,  { passive: false });
+document.addEventListener('touchend',   touchEnd,   { passive: false });
+document.addEventListener('touchcancel',() => {
+  touchDragEl?.remove(); touchDragEl = null;
+  document.querySelectorAll('.cell.drag-over').forEach(c => c.classList.remove('drag-over'));
+  touchBeastId = null; touchFromSlot = null;
+});
 function showTooltip(e, b) {
   const tip = document.getElementById('tooltip');
   const t = I18N[currentLang];
